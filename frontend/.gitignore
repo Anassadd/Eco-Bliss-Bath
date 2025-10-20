@@ -41,7 +41,7 @@ testem.log
 .DS_Store
 Thumbs.db
 
-# Ignorer les fichiers MySQL
+# Ignorer les fichiers MySQL générés
 mysql/
 *.ibd
 *.frm
