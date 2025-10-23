@@ -21,7 +21,8 @@
     "lib": [
       "es2020",
       "dom"
-    ]
+    ],
+    "types": ["cypress"] // <-- LA VOICI ! ON AJOUTE CETTE LIGNE
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

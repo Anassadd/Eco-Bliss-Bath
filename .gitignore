@@ -1,0 +1,12 @@
+# Ignorer les fichiers MySQL
+mysql/
+*.ibd
+*.frm
+*.MAD
+*.MAI
+*.opt
+*.CNF
+*.CSM
+*.CSV
+undo*
+ib*
