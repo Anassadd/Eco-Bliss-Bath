@@ -1,81 +1,98 @@
-describe('Panier – Eco Bliss Bath', () => {
-  const frontUrl = 'http://localhost:4200';
+describe("🛒 Tests du panier - API Eco Bliss Bath", () => {
 
+  const baseUrl = "http://localhost:8081";
+  const username = "test2025@gmail.com";  
+  const password = "Test2025?";        
+
+  // Connexion avant chaque test
+  
   beforeEach(() => {
-    cy.visit(frontUrl + '/#/login');
-
-    cy.get('#username').should('be.visible').type('test2025@gmail.com');
-    cy.get('#password').should('be.visible').type('Test2025?');
-
-    cy.get('button').contains(/Se connecter/i)
-      .should('not.be.disabled')
-      .click();
-
-    cy.url().should('include', '/#/');
-    cy.contains(/Mon panier|Panier/i).should('exist');
+    cy.request({
+      method: "POST",
+      url: `${baseUrl}/login`,
+      body: { username, password }
+    }).then((response) => {
+      expect(response.status).to.eq(200);
+      cy.wrap(response.body.token).as("token");
+    });
   });
 
-  it('Ajoute un produit au panier et vérifie son affichage', () => {
-    // Interceptions des appels API
-    cy.intercept('GET', 'http://localhost:8081/products*').as('getAllProducts');
-    cy.intercept('GET', 'http://localhost:8081/products/*').as('getProductDetails');
-    cy.intercept({ method: /POST|PUT/, url: '**/orders/**' }).as('addToCart');
-
-    // 1️⃣ Aller à la page des produits
-    cy.visit(frontUrl + '/#/products');
-    cy.wait('@getAllProducts', { timeout: 15000 });
-
-    // 2️⃣ Attendre que les produits soient visibles avant de cliquer
-    cy.get('body').then(($body) => {
-      if ($body.find('[data-cy="product-home-link"]').length) {
-        cy.get('[data-cy="product-home-link"]', { timeout: 10000 })
-          .first()
-          .click();
-      } else if ($body.find('button:contains("Consulter")').length) {
-        cy.contains('button', /Consulter|Voir/i, { timeout: 10000 }).first().click();
-      } else {
-        // Si aucun produit n’apparaît, on recharge la page une fois
-        cy.reload();
-        cy.get('[data-cy="product-home-link"]', { timeout: 10000 })
-          .first()
-          .click();
-      }
+  // 1️ Ajout d’un produit disponible
+  it("Ajoute un produit disponible au panier (status 200 attendu)", function () {
+    cy.request({
+      method: "PUT", // ⚠️ anomalie connue : devrait être POST
+      url: `${baseUrl}/orders/add`,
+      headers: { Authorization: `Bearer ${this.token}` },
+      body: { product: 3, quantity: 1 },
+      failOnStatusCode: false
+    }).then((response) => {
+      expect(response.status).to.eq(200); // ✅ attendu
     });
+  });
 
-    // 3️⃣ Attendre que la page détail soit chargée
-    cy.wait('@getProductDetails', { timeout: 15000 });
+  
+  // 2️ Produit en rupture de stock
+    it("Retourne une erreur si le produit est en rupture de stock (409 attendu)", function () {
+    cy.request({
+      method: "PUT",
+      url: `${baseUrl}/orders/add`,
+      headers: { Authorization: `Bearer ${this.token}` },
+      body: { product: 3, quantity: 100 },
+      failOnStatusCode: false
+    }).then((response) => {
+      // ⚠️ anomalie connue : l’API renvoie 200 au lieu de 409
+      if (response.status === 200) {
+        cy.log("⚠️ Anomalie : l’API accepte l’ajout d’un produit en rupture de stock");
+      }
+      expect(response.status).to.eq(409);
+    });
+  });
 
-    // 4️⃣ Cliquer sur “Ajouter au panier”
-    cy.contains(/Ajouter au panier/i, { timeout: 10000 })
-      .should('be.visible')
-      .click();
 
-    // 5️⃣ Vérifier que la requête POST/PUT a bien réussi
-    cy.wait('@addToCart', { timeout: 15000 })
-      .its('response.statusCode')
-      .should('be.oneOf', [200, 201]);
+    // 3️ Quantité négative
+     it("Refuse une quantité négative (400/422 attendu)", function () {
+    cy.request({
+      method: "PUT",
+      url: `${baseUrl}/orders/add`,
+      headers: { Authorization: `Bearer ${this.token}` },
+      body: { product: 3, quantity: -2 },
+      failOnStatusCode: false
+    }).then((response) => {
+      expect(response.status).to.be.oneOf([400, 422]); // ✅ comportement attendu
+    });
+  });
 
-    // 6️⃣ Aller dans le panier
-    cy.contains(/Mon panier|Panier/i).click();
-    cy.url().should('include', '/#/cart');
-    cy.contains(/Votre panier|Panier/i).should('be.visible');
+  
+  // 4️ Quantité supérieure à 20
+  it("Refuse une quantité supérieure à 20 (400/422 attendu)", function () {
+    cy.request({
+      method: "PUT",
+      url: `${baseUrl}/orders/add`,
+      headers: { Authorization: `Bearer ${this.token}` },
+      body: { product: 3, quantity: 21 },
+      failOnStatusCode: false
+    }).then((response) => {
+      // ⚠️ anomalie connue : renvoie parfois 200
+      if (response.status === 200) {
+        cy.log("⚠️ Anomalie : l’API n’impose pas de limite de quantité.");
+      }
+      expect(response.status).to.be.oneOf([400, 422]);
+    });
+  });
 
-    // 7️⃣ Vérifie qu’un produit est bien présent dans le panier
-    const selecteur_item_panier = '[data-cy="cart-line-image"]';
-    cy.get(selecteur_item_panier, { timeout: 10000 })
-      .should('exist')
-      .and('have.length.greaterThan', 0);
-
-    // 8️⃣ Vérifie que le champ quantité ne prend pas de valeurs invalides
-    const selecteur_champ_quantite = 'input[type="number"]';
-    cy.get(selecteur_champ_quantite).first().should('be.visible').then(($input) => {
-      cy.wrap($input).clear().type('-1');
-      cy.wrap($input).invoke('val').should('not.equal', '-1');
-
-      cy.wrap($input).clear().type('21');
-      cy.wrap($input).invoke('val').should('not.equal', '21');
+  
+  // 5️ Vérification du contenu du panier
+  it("Vérifie que le produit ajouté est bien présent dans le panier", function () {
+    cy.request({
+      method: "GET",
+      url: `${baseUrl}/orders`,
+      headers: { Authorization: `Bearer ${this.token}` },
+      failOnStatusCode: false
+    }).then((response) => {
+      expect(response.status).to.eq(200);
+      expect(response.body.orderLines).to.be.an("array").and.not.be.empty;
+      expect(response.body.orderLines[0]).to.have.property("product");
+      expect(response.body.orderLines[0]).to.have.property("quantity");
     });
   });
 });
-
-
