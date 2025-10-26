@@ -1,4 +1,3 @@
-// @ts-nocheck
 describe('Affichage des produits – Eco Bliss Bath', () => {
 
   const baseUrl = 'http://localhost:4200';
@@ -26,19 +25,19 @@ describe('Affichage des produits – Eco Bliss Bath', () => {
     cy.get('article, app-product-card, .product-card', { timeout: 10000 }).each(($produit) => {
       cy.wrap($produit).within(() => {
 
-        // ✅ Image visible
+        //  Image visible
         cy.get('img').should('be.visible');
 
-        // ✅ Nom du produit
+        //  Nom du produit
         cy.get('h3, .product-name').should('exist');
 
-        // ✅ Prix affiché
+        //  Prix affiché
         cy.contains(/€|Prix/i).should('exist');
 
-        // ✅ Bouton visible
+        //  Bouton visible
         cy.contains(/Consulter|Voir|Détail/i).should('exist');
 
-        // ✅ Vérifie la présence du stock (par ex. “-219 en stock”)
+        //  Vérifie la présence du stock (par ex. “-219 en stock”)
         cy.get('*').then(($el) => {
           const texte = $el.text();
           if (texte.match(/en stock|Stock/i)) {

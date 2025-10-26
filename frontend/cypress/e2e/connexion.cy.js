@@ -1,4 +1,3 @@
-// @ts-nocheck
 describe('Connexion – Tests utilisateur Eco Bliss Bath', () => {
 
   const baseUrl = 'http://localhost:4200';

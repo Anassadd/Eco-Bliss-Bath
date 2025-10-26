@@ -1,4 +1,4 @@
-describe("✅ Smoke tests – Eco Bliss Bath", () => {
+describe(" Smoke tests – Eco Bliss Bath", () => {
   const frontUrl = "http://localhost:4200";
   const username = "test2025@gmail.com"; 
   const password = "Test2025?";
@@ -45,12 +45,10 @@ describe("✅ Smoke tests – Eco Bliss Bath", () => {
   });
 });
 
+//  XSS SIMPLE – Vérification basique (corrigée & stable)
 
-// -------------------------------------------------------------
-// 🧨 XSS SIMPLE – Vérification basique (corrigée & stable)
-// -------------------------------------------------------------
 
-describe("🧨 Test XSS simple – Champ commentaire", () => {
+describe(" Test XSS simple – Champ commentaire", () => {
   const frontUrl = "http://localhost:4200";
   const username = "test2025@gmail.com";
   const password = "Test2025?";
@@ -60,7 +58,7 @@ describe("🧨 Test XSS simple – Champ commentaire", () => {
   // Bloque toute alerte JavaScript si une injection tente de s’exécuter
   beforeEach(() => {
     cy.on("window:alert", (txt) => {
-      throw new Error(`🚨 Faille XSS détectée : alerte affichée (${txt})`);
+      throw new Error(` Faille XSS détectée : alerte affichée (${txt})`);
     });
   });
 
@@ -84,7 +82,7 @@ describe("🧨 Test XSS simple – Champ commentaire", () => {
     // Si la page affiche "Connectez-vous pour ajouter un avis", on arrête gentiment
     cy.get("body").then(($body) => {
       if ($body.text().includes("Connectez-vous pour ajouter un avis")) {
-        cy.log("⚠️ Zone de commentaire non visible (non connecté ou masqué). Test arrêté proprement.");
+        cy.log(" Zone de commentaire non visible (non connecté ou masqué). Test arrêté proprement.");
         return;
       }
 
@@ -93,7 +91,7 @@ describe("🧨 Test XSS simple – Champ commentaire", () => {
       const field = $body.find(selectors).first();
 
       if (field.length === 0) {
-        cy.log("⚠️ Aucun champ de commentaire trouvé — test non applicable visuellement.");
+        cy.log(" Aucun champ de commentaire trouvé — test non applicable visuellement.");
         return;
       }
 
@@ -115,11 +113,11 @@ describe("🧨 Test XSS simple – Champ commentaire", () => {
         const text = $b.text();
 
         if (html.toLowerCase().includes("<script")) {
-          throw new Error("🚨 Faille XSS détectée : balise <script> trouvée dans le DOM !");
+          throw new Error(" Faille XSS détectée : balise <script> trouvée dans le DOM !");
         } else if (text.includes(marker)) {
-          cy.log("✅ Commentaire affiché comme texte (aucune exécution de script).");
+          cy.log(" Commentaire affiché comme texte (aucune exécution de script).");
         } else {
-          cy.log("✅ Commentaire filtré ou encodé (sécurité active).");
+          cy.log(" Commentaire filtré ou encodé (sécurité active).");
         }
       });
     });
