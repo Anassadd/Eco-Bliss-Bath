@@ -74,7 +74,7 @@ describe(" Tests du panier - API Eco Bliss Bath", () => {
     }).then((response) => {
       //  anomalie connue : renvoie parfois 200
       if (response.status === 200) {
-        cy.log("⚠️ Anomalie : l’API n’impose pas de limite de quantité.");
+        cy.log(" Anomalie : l’API n’impose pas de limite de quantité.");
       }
       expect(response.status).to.be.oneOf([400, 422]);
     });

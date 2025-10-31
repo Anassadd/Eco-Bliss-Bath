@@ -40,14 +40,3 @@ describe('Connexion – Tests utilisateur Eco Bliss Bath', () => {
   });
 
 });
-
-
-
-
-
-
-
-
-
-
-

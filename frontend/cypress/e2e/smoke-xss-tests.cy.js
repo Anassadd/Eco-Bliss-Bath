@@ -123,6 +123,3 @@ describe(" Test XSS simple – Champ commentaire", () => {
     });
   });
 });
-
-
-

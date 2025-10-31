@@ -49,6 +49,3 @@ describe('Affichage des produits – Eco Bliss Bath', () => {
   });
 
 });
-
-
-
