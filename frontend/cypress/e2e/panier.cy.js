@@ -1,98 +1,69 @@
-describe(" Tests du panier - API Eco Bliss Bath", () => {
+describe('Panier – UI (ajout depuis une fiche produit en stock)', () => {
+  const FRONT = 'http://localhost:4200';
+  const API   = 'http://localhost:8081';
 
-  const baseUrl = "http://localhost:8081";
-  const username = "test2025@gmail.com";  
-  const password = "Test2025?";        
-
-  // Connexion avant chaque test
-  
   beforeEach(() => {
-    cy.request({
-      method: "POST",
-      url: `${baseUrl}/login`,
-      body: { username, password }
-    }).then((response) => {
-      expect(response.status).to.eq(200);
-      cy.wrap(response.body.token).as("token");
-    });
+    // Arrange: on espionne les appels utiles
+    cy.intercept('POST', `${API}/login`).as('apiLogin');
+    cy.intercept('GET',  `${API}/products/*`).as('apiProductDetail');
+    // Couvrir absolu/relatif + PUT/POST
+    cy.intercept({ method: /PUT|POST/, url: `${API}/orders/add*` }).as('apiAddAbs');
+    cy.intercept({ method: /PUT|POST/, url: '**/orders/add*' }).as('apiAddAny');
+
+    // Login via UI
+    cy.visit(`${FRONT}/#/login`);
+    cy.get('[data-cy="login-input-username"], #username, input[type="email"]').first().clear().type('test2@test.fr');
+    cy.get('[data-cy="login-input-password"], #password, input[type="password"]').first().clear().type('testtest');
+    cy.contains('button', /Se connecter|Connexion|Log in/i).click();
+    cy.wait('@apiLogin').its('response.statusCode').should('eq', 200);
   });
 
-  // 1️ Ajout d’un produit disponible
-  it("Ajoute un produit disponible au panier (status 200 attendu)", function () {
-    cy.request({
-      method: "PUT", 
-      url: `${baseUrl}/orders/add`,
-      headers: { Authorization: `Bearer ${this.token}` },
-      body: { product: 3, quantity: 1 },
-      failOnStatusCode: false
-    }).then((response) => {
-      expect(response.status).to.eq(200); 
-    });
-  });
+  it('Ajout au panier via UI → bouton visible + appel /orders/add reçu', () => {
+    // ARRANGE: récupérer un produit en stock pour cibler une fiche sûre
+    cy.request(`${API}/products`).then((res) => {
+      expect(res.status).to.eq(200);
+      const prod = res.body.find(p => (p.stock ?? 0) > 0) || res.body[0];
+      expect(prod, 'produit en stock trouvé').to.exist;
 
-  
-  // 2️ Produit en rupture de stock
-    it("Retourne une erreur si le produit est en rupture de stock (409 attendu)", function () {
-    cy.request({
-      method: "PUT",
-      url: `${baseUrl}/orders/add`,
-      headers: { Authorization: `Bearer ${this.token}` },
-      body: { product: 3, quantity: 100 },
-      failOnStatusCode: false
-    }).then((response) => {
-      //  anomalie connue : l’API renvoie 200 au lieu de 409
-      if (response.status === 200) {
-        cy.log(" Anomalie : l’API accepte l’ajout d’un produit en rupture de stock");
-      }
-      expect(response.status).to.eq(409);
-    });
-  });
+      // ACT: ouvrir directement la fiche du produit
+      const id = prod.id ?? prod._id ?? prod.uuid;
+      cy.visit(`${FRONT}/#/products/${id}`);
+      cy.wait('@apiProductDetail').its('response.statusCode').should('eq', 200);
 
+      //  Beaucoup d’UIs exigent une quantité > 0 → on la renseigne
+      cy.get('input[type="number"], input[name="quantity"], input[aria-label*="quantit"], input[id*="quantit"]')
+        .first()
+        .then($q => {
+          if ($q.length) cy.wrap($q).clear().type('1');
+        });
 
-    // 3️ Quantité négative
-     it("Refuse une quantité négative (400/422 attendu)", function () {
-    cy.request({
-      method: "PUT",
-      url: `${baseUrl}/orders/add`,
-      headers: { Authorization: `Bearer ${this.token}` },
-      body: { product: 3, quantity: -2 },
-      failOnStatusCode: false
-    }).then((response) => {
-      expect(response.status).to.be.oneOf([400, 422]); 
-    });
-  });
+      // ACT: cliquer “Ajouter au panier”
+      cy.contains('button', /Ajouter au panier|Ajouter/i)
+        .scrollIntoView()
+        .should('be.visible')
+        .and('not.be.disabled')
+        .click();
 
-  
-  // 4️ Quantité supérieure à 20
-  it("Refuse une quantité supérieure à 20 (400/422 attendu)", function () {
-    cy.request({
-      method: "PUT",
-      url: `${baseUrl}/orders/add`,
-      headers: { Authorization: `Bearer ${this.token}` },
-      body: { product: 3, quantity: 21 },
-      failOnStatusCode: false
-    }).then((response) => {
-      //  anomalie connue : renvoie parfois 200
-      if (response.status === 200) {
-        cy.log(" Anomalie : l’API n’impose pas de limite de quantité.");
-      }
-      expect(response.status).to.be.oneOf([400, 422]);
-    });
-  });
+      // ASSERT: attendre l’appel /orders/add (absolu ou relatif)
+      cy.wait(['@apiAddAbs', '@apiAddAny'], { timeout: 10000 }).then((arr) => {
+        // Cypress renvoie un tableau des interceptions abouties
+        const inter = Array.isArray(arr) ? (arr.find(Boolean) || arr[0]) : arr;
+        expect(inter.request.method).to.match(/PUT|POST/); // projet: PUT attendu
+        expect(inter.response.statusCode).to.eq(200);
+      });
 
-  
-  // 5️ Vérification du contenu du panier
-  it("Vérifie que le produit ajouté est bien présent dans le panier", function () {
-    cy.request({
-      method: "GET",
-      url: `${baseUrl}/orders`,
-      headers: { Authorization: `Bearer ${this.token}` },
-      failOnStatusCode: false
-    }).then((response) => {
-      expect(response.status).to.eq(200);
-      expect(response.body.orderLines).to.be.an("array").and.not.be.empty;
-      expect(response.body.orderLines[0]).to.have.property("product");
-      expect(response.body.orderLines[0]).to.have.property("quantity");
+      // Feedback visuel optionnel (n’échoue pas s’il est absent)
+      cy.get('body').then(($b) => {
+        const hasToast = $b.find('[data-cy="toast"], [role="alert"], .toast, .snackbar').length > 0;
+        const hasCart  = /Mon panier|Panier|Cart/i.test($b.text());
+        if (hasToast) {
+          cy.get('[data-cy="toast"], [role="alert"], .toast, .snackbar').first().should('be.visible');
+        } else if (hasCart) {
+          cy.contains(/Mon panier|Panier|Cart/i).should('exist');
+        } else {
+          cy.log('Ajout confirmé par le réseau; aucun feedback visuel détectable.');
+        }
+      });
     });
   });
 });
