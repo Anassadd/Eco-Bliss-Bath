@@ -1,41 +1,29 @@
-// cypress/e2e/smoke-tests.cy.js
 describe('Smoke & XSS — Eco Bliss Bath (Simple)', () => {
   const FRONT = 'http://localhost:4200';
   const API   = 'http://localhost:8081';
-  const USER  = { username: 'test2025@gmail.com', password: 'Test2025?' }; // Tes identifiants
+  const USER  = { username: 'test2025@gmail.com', password: 'Test2025?' };
 
   // ========= SMOKE TEST 1 =========
   it('Smoke: Accueil — la page se charge', () => {
-    // Arrange (rien)
-    // Act
     cy.visit(FRONT);
-    // Assert
     cy.title().should('not.be.empty');
   });
 
   // ========= SMOKE TEST 2 =========
   it('Smoke: Login — la page se charge et les champs sont visibles', () => {
-    // Arrange (rien)
-    // Act
     cy.visit(`${FRONT}/#/login`);
-    // Assert (on utilise les sélecteurs simples)
     cy.get('#username').should('be.visible');
     cy.get('#password').should('be.visible');
   });
 
   // ========= SMOKE TEST 3 =========
   it("Smoke: Produits — la page se charge et attend l'API", () => {
-    // Arrange (espionner le réseau)
     cy.intercept('GET', `${API}/products`).as('apiProducts');
-    
-    // Act (visiter la page)
     cy.visit(`${FRONT}/#/products`);
-    
-    // Assert (attendre l'API - pas de wait fixe)
     cy.wait('@apiProducts').its('response.statusCode').should('eq', 200);
   });
 
-  // ========= TEST XSS (demandé par la prof) =========
+  // ========= TEST XSS =========
 describe('XSS — champ commentaire (simple)', () => {
   const payload = `<script>alert('XSS')</script>`;
 

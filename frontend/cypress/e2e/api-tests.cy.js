@@ -2,12 +2,11 @@ describe('API – Eco Bliss Bath', () => {
   const API = 'http://localhost:8081';
   const creds = { username: 'test2025@gmail.com', password: 'Test2025?' };
 
-  let token;         // réutilisé par les tests
+  let token;         
   let productId;     // id produit existant (>0 stock si possible)
 
   // Arrange (global) : login + récupérer un produit existant
   before(() => {
-    // Login (on garde failOnStatusCode:false UNIQUEMENT quand on s’attend à des erreurs, pas ici)
     cy.request('POST', `${API}/login`, creds).then((res) => {
       expect(res.status).to.eq(200);
       expect(res.body).to.have.property('token');
@@ -26,9 +25,7 @@ describe('API – Eco Bliss Bath', () => {
 
   // 1) GET /products → 200 + tableau non vide
   it('GET /products retourne 200 et une liste non vide', () => {
-    // Act
     cy.request('GET', `${API}/products`)
-    // Assert
       .then((res) => {
         expect(res.status).to.eq(200);
         expect(res.body).to.be.an('array').and.not.be.empty;
@@ -43,7 +40,7 @@ describe('API – Eco Bliss Bath', () => {
     });
   });
 
-  // 3) GET /orders non authentifié → 403 attendu (bilan Marie), mais l’API renvoie parfois 401
+  // 3) GET /orders non authentifié → 403 attendu
   it('GET /orders (non authentifié) → 401 ou 403 (bilan attend 403)', () => {
     cy.request({
       method: 'GET',
@@ -83,7 +80,6 @@ describe('API – Eco Bliss Bath', () => {
       body: { product: productId, quantity: 1 },
       failOnStatusCode: false, // on s’attend à une erreur de méthode
     }).then((res) => {
-      // On documente l’anomalie : POST renvoie 405 (Method Not Allowed)
       expect(res.status).to.eq(405);
     });
   });
