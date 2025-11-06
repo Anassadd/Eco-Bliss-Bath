@@ -1,51 +1,48 @@
-describe('Affichage des produits – Eco Bliss Bath', () => {
+describe('Produits – UI Eco Bliss Bath', () => {
+  const FRONT = 'http://localhost:4200';
+  const API   = 'http://localhost:8081';
 
-  const baseUrl = 'http://localhost:4200';
+  // Sélecteurs tolérants
+  const selecteur_item_produit   = 'article, app-product-card, .product-card';
+  const selecteur_nom_produit    = 'h3, .product-name';
+  const selecteur_prix_produit   = '.price, :contains("€")';
+  const selecteur_stock_produit  = '.stock, :contains("en stock"), :contains("En stock")';
+  const selecteur_bouton_consulter = 'button:contains("Consulter"), a:contains("Consulter"), button:contains("Voir"), a:contains("Voir"), button:contains("Détail"), a:contains("Détail")';
+  const selecteur_image_produit  = 'img';
 
   beforeEach(() => {
-    cy.intercept('GET', 'http://localhost:8081/products').as('getProducts');
-    cy.visit(baseUrl + '/#/products');
-    cy.wait('@getProducts');
+    cy.intercept('GET', `${API}/products`).as('apiProducts');
+    cy.visit(`${FRONT}/#/products`);
+    cy.wait('@apiProducts').its('response.statusCode').should('eq', 200);
   });
 
-  it('Charge correctement la page Produits', () => {
-    cy.url().should('include', '/#/products');
-    cy.get('h1, h2, h3').invoke('text').then((texte) => {
-      expect(texte).to.match(/produits|nos produits/i);
-    });
-  });
+  it('Chaque carte → image, nom, prix, bouton Consulter, stock', () => {
+    cy.get(selecteur_item_produit, { timeout: 10000 })
+      .should('have.length.greaterThan', 0)
+      .each(($card) => {
+        cy.wrap($card).within(() => {
+          cy.get(selecteur_image_produit)
+            .should('be.visible')
+            .and(($img) => {
+              expect($img[0].naturalWidth).to.be.greaterThan(0);
+            });
 
-  it('Affiche la liste des produits', () => {
-    cy.get('article, app-product-card, .product-card', { timeout: 10000 })
-      .should('exist')
-      .and('have.length.greaterThan', 0);
-  });
+          cy.get(selecteur_nom_produit).should('exist').and('be.visible');
 
-  it('Chaque produit contient une image, un nom, un prix, un bouton et un stock', () => {
-    cy.get('article, app-product-card, .product-card', { timeout: 10000 }).each(($produit) => {
-      cy.wrap($produit).within(() => {
+          cy.get(selecteur_prix_produit).should('exist').then(($el) => {
+            const txt = $el.text().replace(/\s/g, '');
+            expect(txt).to.match(/\d+[.,]?\d*€/);
+          });
 
-        //  Image visible
-        cy.get('img').should('be.visible');
+          cy.get(selecteur_bouton_consulter).should('exist');
 
-        //  Nom du produit
-        cy.get('h3, .product-name').should('exist');
-
-        //  Prix affiché
-        cy.contains(/€|Prix/i).should('exist');
-
-        //  Bouton visible
-        cy.contains(/Consulter|Voir|Détail/i).should('exist');
-
-        //  Vérifie la présence du stock (par ex. “-219 en stock”)
-        cy.get('*').then(($el) => {
-          const texte = $el.text();
-          if (texte.match(/en stock|Stock/i)) {
-            expect(texte).to.match(/[-]?\d+\s*en stock/i);
-          }
+          cy.get('*').then(($all) => {
+            const t = $all.text();
+            if (/en stock/i.test(t)) {
+              expect(t).to.match(/-?\d+\s*en stock/i);
+            }
+          });
         });
       });
-    });
   });
-
 });

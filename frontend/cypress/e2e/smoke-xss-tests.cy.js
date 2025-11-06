@@ -1,125 +1,101 @@
-describe(" Smoke tests – Eco Bliss Bath", () => {
-  const frontUrl = "http://localhost:4200";
-  const username = "test2025@gmail.com"; 
-  const password = "Test2025?";
+// cypress/e2e/smoke-tests.cy.js
+describe('Smoke & XSS — Eco Bliss Bath (Simple)', () => {
+  const FRONT = 'http://localhost:4200';
+  const API   = 'http://localhost:8081';
+  const USER  = { username: 'test2025@gmail.com', password: 'Test2025?' }; // Tes identifiants
 
-  it("La page d’accueil se charge correctement", () => {
-    cy.visit(frontUrl);
-    cy.title().should("not.be.empty");
+  // ========= SMOKE TEST 1 =========
+  it('Smoke: Accueil — la page se charge', () => {
+    // Arrange (rien)
+    // Act
+    cy.visit(FRONT);
+    // Assert
+    cy.title().should('not.be.empty');
   });
 
-  it("Le formulaire de connexion s’affiche", () => {
-    cy.visit(frontUrl);
-    cy.contains(/Connexion|Se connecter|Login/i, { timeout: 8000 }).should("be.visible").click();
-    cy.get("#username, input[type='email']", { timeout: 8000 }).should("be.visible");
-    cy.get("#password, input[type='password']", { timeout: 8000 }).should("be.visible");
+  // ========= SMOKE TEST 2 =========
+  it('Smoke: Login — la page se charge et les champs sont visibles', () => {
+    // Arrange (rien)
+    // Act
+    cy.visit(`${FRONT}/#/login`);
+    // Assert (on utilise les sélecteurs simples)
+    cy.get('#username').should('be.visible');
+    cy.get('#password').should('be.visible');
   });
 
-  it("Connexion avec identifiants valides affiche le panier et le bouton Ajouter", () => {
-    cy.visit(frontUrl + "/#/login");
+  // ========= SMOKE TEST 3 =========
+  it("Smoke: Produits — la page se charge et attend l'API", () => {
+    // Arrange (espionner le réseau)
+    cy.intercept('GET', `${API}/products`).as('apiProducts');
+    
+    // Act (visiter la page)
+    cy.visit(`${FRONT}/#/products`);
+    
+    // Assert (attendre l'API - pas de wait fixe)
+    cy.wait('@apiProducts').its('response.statusCode').should('eq', 200);
+  });
 
-    cy.get("#username, input[type='email']", { timeout: 8000 })
-      .first().should("be.visible").clear().type(username);
-    cy.get("#password, input[type='password']", { timeout: 8000 })
-      .first().should("be.visible").clear().type(password);
+  // ========= TEST XSS (demandé par la prof) =========
+describe('XSS — champ commentaire (simple)', () => {
+  const payload = `<script>alert('XSS')</script>`;
 
-    cy.contains("button", /Se connecter|Connexion|Log in/i, { timeout: 8000 })
-      .should("not.be.disabled")
-      .click();
-
-    // 🩵 Correction : vérifie simplement que l'URL change
-    cy.url({ timeout: 10000 }).then((url) => {
-      expect(url).to.satisfy((u) => u.includes("/#/") || u.endsWith("/"));
+  it('Publier un commentaire <script> ne doit pas exécuter de JS', () => {
+    // 1) Spy anti-XSS : si une alert() s’exécute -> échec immédiat
+    cy.on('window:alert', (txt) => {
+      throw new Error(`XSS exécuté: ${txt}`);
     });
 
-    // Vérifie que le lien "Mon panier" est visible
-    cy.contains(/Mon panier|Panier|Cart/i, { timeout: 10000 }).should("exist");
+    // 2) Arrange
+    cy.intercept('POST', `${API}/login`).as('apiLogin');
+    cy.intercept('GET',  `${API}/reviews`).as('apiGetReviews');
+    cy.intercept('POST', `${API}/reviews`).as('apiPostReview');
 
-    // Va sur la page produits
-    cy.get('a[href="#/products"], a:contains("Produits")', { timeout: 10000 })
-      .first().click();
+    // 3) Act: login
+    cy.visit(`${FRONT}/#/login`);
+    cy.get('#username').type(USER.username);
+    cy.get('#password').type(USER.password);
+    cy.contains('button', /Se connecter/i).click();
+    cy.wait('@apiLogin');
 
-    // Vérifie qu’un bouton “Consulter” ou “Ajouter au panier” est présent
-    cy.get('button:contains("Consulter"), button:contains("Ajouter au panier")', { timeout: 10000 })
-      .first().should("be.visible");
-  });
-});
+    // 4) Act: nav vers Avis + attendre le GET
+    cy.get('a[href="#/reviews"], a:contains("Avis")').first().click();
+    cy.wait('@apiGetReviews');
 
-//  XSS SIMPLE – Vérification basique (corrigée & stable)
+    // 5) Act: remplir les champs requis pour activer "Publier"
+    //    - Titre
+    cy.get('[data-cy="review-input-title"]')
+      .scrollIntoView()
+      .should('exist')
+      .type('Test XSS');
 
-
-describe(" Test XSS simple – Champ commentaire", () => {
-  const frontUrl = "http://localhost:4200";
-  const username = "test2025@gmail.com";
-  const password = "Test2025?";
-  const scriptXSS = `<script>alert('XSS')</script>`;
-  const marker = "XSS";
-
-  // Bloque toute alerte JavaScript si une injection tente de s’exécuter
-  beforeEach(() => {
-    cy.on("window:alert", (txt) => {
-      throw new Error(` Faille XSS détectée : alerte affichée (${txt})`);
-    });
-  });
-
-  it("Poste un commentaire contenant un script sans qu’il s’exécute", () => {
-    // Connexion
-    cy.visit(frontUrl + "/#/login");
-
-    cy.get("#username, input[type='email']", { timeout: 8000 })
-      .first().should("be.visible").clear().type(username);
-    cy.get("#password, input[type='password']", { timeout: 8000 })
-      .first().should("be.visible").clear().type(password);
-
-    cy.contains("button", /Se connecter|Connexion|Log in/i, { timeout: 8000 })
-      .should("not.be.disabled")
+    //    - Étoiles (au moins 1) — clique la 5e pour être sûr
+    cy.get('[data-cy="review-input-rating-images"] img')
+      .eq(4)
       .click();
 
-    // Aller sur la page Avis
-    cy.get('a[href="#/reviews"], a:contains("Avis")', { timeout: 10000 })
-      .first().click();
+    //    - Commentaire (ton payload). On scrolle + force:true pour éviter l’erreur "not visible"
+    cy.get('[data-cy="review-input-comment"]')
+      .scrollIntoView()
+      .should('exist')
+      .type(payload, { force: true });
 
-    // Si la page affiche "Connectez-vous pour ajouter un avis", on arrête gentiment
-    cy.get("body").then(($body) => {
-      if ($body.text().includes("Connectez-vous pour ajouter un avis")) {
-        cy.log(" Zone de commentaire non visible (non connecté ou masqué). Test arrêté proprement.");
-        return;
-      }
+    // 6) Act: publier quand le bouton est actif
+    cy.get('[data-cy="review-submit"]')
+      .scrollIntoView()
+      .should('exist')
+      .and('not.be.disabled')
+      .click();
 
-      // Champ commentaire (tolérant)
-      const selectors = "textarea, input[type='text'], [contenteditable='true']";
-      const field = $body.find(selectors).first();
+    // 7) Assert réseau: le POST doit partir
+    cy.wait('@apiPostReview').its('response.statusCode').should('be.oneOf', [200, 201]);
 
-      if (field.length === 0) {
-        cy.log(" Aucun champ de commentaire trouvé — test non applicable visuellement.");
-        return;
-      }
-
-      cy.wrap(field)
-        .scrollIntoView()
-        .should("be.visible")
-        .clear()
-        .type(scriptXSS, { delay: 15 });
-
-      // Bouton Publier / Envoyer
-      cy.contains("button", /Envoyer|Publier|Ajouter/i, { timeout: 8000 })
-        .should("be.visible")
-        .click();
-
-      // Attente courte et vérification du texte visible
-      cy.wait(1000);
-      cy.get("body").then(($b) => {
-        const html = $b.html();
-        const text = $b.text();
-
-        if (html.toLowerCase().includes("<script")) {
-          throw new Error(" Faille XSS détectée : balise <script> trouvée dans le DOM !");
-        } else if (text.includes(marker)) {
-          cy.log(" Commentaire affiché comme texte (aucune exécution de script).");
-        } else {
-          cy.log(" Commentaire filtré ou encodé (sécurité active).");
-        }
-      });
+    // 8) Assert XSS: aucune exécution (déjà couverte par window:alert)
+    //    Optionnel : on vérifie que la chaîne "<script" n’a pas été injectée telle quelle dans la zone des avis
+    //    (le texte peut être encodé &lt;script&gt; -> c’est OK)
+    cy.get('body').then($b => {
+      const html = $b.html().toLowerCase();
+      expect(html).not.to.include("<script>alert('xss')");
     });
   });
 });
+ });
