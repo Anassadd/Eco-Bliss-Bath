@@ -3,7 +3,7 @@ describe('API – Eco Bliss Bath', () => {
   const creds = { username: 'test2025@gmail.com', password: 'Test2025?' };
 
   let token;         
-  let productId;     // id produit existant (>0 stock si possible)
+  let productId;    
 
   // Arrange (global) : login + récupérer un produit existant
   before(() => {
@@ -45,7 +45,7 @@ describe('API – Eco Bliss Bath', () => {
     cy.request({
       method: 'GET',
       url: `${API}/orders`,
-      failOnStatusCode: false, // on TESTE volontairement une erreur attendue
+      failOnStatusCode: false, 
     }).then((res) => {
       expect([401, 403]).to.include(res.status); // tolérant : 401 OU 403
     });
@@ -78,7 +78,7 @@ describe('API – Eco Bliss Bath', () => {
       url: `${API}/orders/add`,
       headers: { Authorization: `Bearer ${token}` },
       body: { product: productId, quantity: 1 },
-      failOnStatusCode: false, // on s’attend à une erreur de méthode
+      failOnStatusCode: false, 
     }).then((res) => {
       expect(res.status).to.eq(405);
     });
